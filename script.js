@@ -121,51 +121,51 @@
 
         const positionSecret = () => {
             if (!lens.source || (!lens.radius && !lens.targetRadius)) return;
+            // Mask wrappers include clipping padding and moving children. Anchor to
+            // the rendered line itself, not the wrapper's unanimated border box.
+            const anchor = lens.source.querySelector('.line-mask > span, .letter-inner') || lens.source;
             const rect = lens.source.getBoundingClientRect();
-            secretCopy.style.transform = `translate3d(${rect.left.toFixed(2)}px, ${rect.top.toFixed(2)}px, 0)`;
+            const anchorRect = anchor.getBoundingClientRect();
+            const typography = getComputedStyle(anchor);
+            const sourceStyle = getComputedStyle(lens.source);
+            const originX = anchorRect.left + (parseFloat(typography.paddingLeft) || 0);
+            const originY = anchorRect.top + (parseFloat(typography.paddingTop) || 0);
+            secretCopy.style.transform = `translate3d(${originX.toFixed(2)}px, ${originY.toFixed(2)}px, 0)`;
             if (!refitNeeded && Math.abs(rect.width - lens.width) < .5 && Math.abs(rect.height - lens.height) < .5) return;
             refitNeeded = false;
             lens.width = rect.width;
             lens.height = rect.height;
             if (rect.width < 1 || rect.height < 1) return;
 
-            const typography = getComputedStyle(lens.source);
             const fontSize = parseFloat(typography.fontSize) || 16;
             const lineHeight = parseFloat(typography.lineHeight);
             const letterSpacing = parseFloat(typography.letterSpacing) || 0;
             Object.assign(secretCopy.style, {
                 width: `${rect.width}px`,
-                height: `${rect.height}px`,
+                height: 'auto',
                 boxSizing: 'border-box',
                 fontFamily: typography.fontFamily,
                 fontWeight: typography.fontWeight,
                 fontStyle: typography.fontStyle,
                 fontStretch: typography.fontStretch,
+                fontFeatureSettings: typography.fontFeatureSettings,
+                fontVariationSettings: typography.fontVariationSettings,
                 lineHeight: Number.isFinite(lineHeight) ? String(lineHeight / fontSize) : '1.15',
-                textAlign: typography.textAlign,
+                textAlign: sourceStyle.textAlign,
                 textTransform: lens.source.classList.contains('hero-name') ? 'none' : typography.textTransform,
                 whiteSpace: 'normal',
-                overflowWrap: 'anywhere'
+                overflowWrap: 'normal',
+                wordBreak: 'normal'
             });
 
-            // Fit alternate words inside the existing footprint, never change page geometry.
+            // Keep the same font metrics and baseline. Shrinking a longer joke to
+            // fit the old box made the reveal appear to jump away from the text.
             const applySize = (size) => {
                 secretCopy.style.fontSize = `${size}px`;
                 secretCopy.style.letterSpacing = `${letterSpacing * size / fontSize}px`;
             };
-            const fits = () => secretCopy.scrollHeight <= Math.ceil(rect.height) + 1 && secretCopy.scrollWidth <= Math.ceil(rect.width) + 1;
             applySize(fontSize);
-            if (!fits()) {
-                let low = Math.min(8, fontSize);
-                let high = fontSize;
-                for (let attempt = 0; attempt < 9; attempt += 1) {
-                    const candidate = (low + high) / 2;
-                    applySize(candidate);
-                    if (fits()) low = candidate;
-                    else high = candidate;
-                }
-                applySize(low);
-            }
+            secretCopy.querySelector('.secret-name')?.style.setProperty('line-height', 'inherit');
         };
 
         const measure = () => {
